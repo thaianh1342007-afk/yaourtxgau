@@ -689,19 +689,58 @@ async function fetchFromSheetDB(){
   }
 }
 
-/* Ghi đè dữ liệu 1 tab trên SheetDB (Xóa cũ -> Thêm mới) */
-async function replaceSheetTab(sheetName, rows){
-  var delRes = await fetch(SHEETDB_API + '/all?sheet=' + encodeURIComponent(sheetName), {
-    method: 'DELETE'
-  });
-  if(!delRes.ok) throw new Error('Lỗi xóa dữ liệu cũ ở tab ' + sheetName);
-  if(rows && rows.length){
+/* Đồng bộ từng dòng trên SheetDB (Cập nhật PATCH -> Thêm POST -> Xóa từng ID) */
+async function syncSheetTab(sheetName, keyCol, newRows){
+  var getRes = await fetch(SHEETDB_API + '?sheet=' + encodeURIComponent(sheetName));
+  if(!getRes.ok) throw new Error('Không đọc được tab ' + sheetName);
+  var existing = await getRes.json();
+  if(!Array.isArray(existing)) existing = [];
+
+  var existingKeys = new Set(existing.map(function(r){ return String(r[keyCol] || ''); }).filter(Boolean));
+  var newKeys = new Set(newRows.map(function(r){ return String(r[keyCol] || ''); }).filter(Boolean));
+
+  // 1. Xóa từng dòng đã bị gỡ bỏ trên giao diện
+  for(var k of existingKeys){
+    if(!newKeys.has(k)){
+      var delRes = await fetch(SHEETDB_API + '/' + encodeURIComponent(keyCol) + '/' + encodeURIComponent(k) + '?sheet=' + encodeURIComponent(sheetName), {
+        method: 'DELETE'
+      });
+      if(!delRes.ok){
+        var errTxt = await delRes.text();
+        throw new Error('Lỗi xóa ở ' + sheetName + ': ' + errTxt);
+      }
+    }
+  }
+
+  // 2. Cập nhật (PATCH) dòng cũ hoặc Thêm mới (POST)
+  var toInsert = [];
+  for(var row of newRows){
+    var val = String(row[keyCol] || '');
+    if(val && existingKeys.has(val)){
+      var patchRes = await fetch(SHEETDB_API + '/' + encodeURIComponent(keyCol) + '/' + encodeURIComponent(val) + '?sheet=' + encodeURIComponent(sheetName), {
+        method: 'PATCH',
+        headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
+        body: JSON.stringify({ data: row })
+      });
+      if(!patchRes.ok){
+        var errTxt2 = await patchRes.text();
+        throw new Error('Lỗi cập nhật ở ' + sheetName + ': ' + errTxt2);
+      }
+    }else{
+      toInsert.push(row);
+    }
+  }
+
+  if(toInsert.length){
     var postRes = await fetch(SHEETDB_API + '?sheet=' + encodeURIComponent(sheetName), {
       method: 'POST',
       headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
-      body: JSON.stringify({ data: rows })
+      body: JSON.stringify({ data: toInsert })
     });
-    if(!postRes.ok) throw new Error('Lỗi ghi dữ liệu mới vào tab ' + sheetName);
+    if(!postRes.ok){
+      var errTxt3 = await postRes.text();
+      throw new Error('Lỗi thêm mới ở ' + sheetName + ': ' + errTxt3);
+    }
   }
 }
 
@@ -749,13 +788,11 @@ async function save(){
       }
     ];
 
-    await Promise.all([
-      replaceSheetTab('Settings', settingsRows),
-      replaceSheetTab('Memories', memRows),
-      replaceSheetTab('Letters', letRows),
-      replaceSheetTab('Photos', phoRows),
-      replaceSheetTab('AboutUs', aboutRows)
-    ]);
+    await syncSheetTab('Settings', 'key', settingsRows);
+    await syncSheetTab('Memories', 'id', memRows);
+    await syncSheetTab('Letters', 'id', letRows);
+    await syncSheetTab('Photos', 'id', phoRows);
+    await syncSheetTab('AboutUs', 'who', aboutRows);
 
     saved=clone(next);S=clone(next);editing=false;busy=false;syncState='live';render();
     toast('Đã lưu lên Google Sheets! Người yêu mở trang sẽ thấy ngay ✨');
