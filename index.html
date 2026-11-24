@@ -38,6 +38,14 @@ body{background:var(--bg);color:var(--ink);font:16px/1.7 var(--font-body);margin
 .top{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;min-height:44px}
 .top-right{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 
+/* Thanh trạng thái đồng bộ Google Sheets */
+.sync-pill{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:500;padding:5px 11px;border-radius:999px;background:var(--surface);border:1px solid var(--line);color:var(--muted)}
+.sync-dot{width:8px;height:8px;border-radius:50%;background:#bbb}
+.sync-pill.live .sync-dot{background:#2ecc71;box-shadow:0 0 0 3px rgba(46,204,113,.2)}
+.sync-pill.loading .sync-dot{background:#f39c12;animation:pulseDot 1s infinite}
+.sync-pill.error .sync-dot{background:#e74c3c}
+@keyframes pulseDot{0%,100%{opacity:1}50%{opacity:.3}}
+
 /* Thanh chuyển đổi 3 mục (Tabs) */
 .tabs{display:inline-flex;background:var(--surface);border:1.5px solid var(--line);border-radius:999px;padding:4px;gap:4px;box-shadow:0 3px 10px rgba(61,49,42,.06);flex-wrap:wrap}
 .tab{border:0;background:transparent;color:var(--muted);font-weight:600;font-size:14.5px;padding:8px 16px;border-radius:999px;transition:transform .2s cubic-bezier(.34,1.56,.64,1),background .2s,color .2s;display:inline-flex;align-items:center;gap:6px}
@@ -232,41 +240,10 @@ textarea.fld{resize:vertical;min-height:105px;line-height:1.6}
 
 <script id="state" type="application/json">{"sample": false, "nameA": "Gâu", "nameB": "Yaourt", "tagline": "Nơi an toàn của Yaourt và Gâu!", "startDate": "2026-08-24", "about": {"boy": {"name": "Gâu", "nickname": "Chú cún Golden Retriever", "birthday": "2007", "likes": "Thích Yaourt, thích đi dạo cùng em, đồ ăn ngon và ôm em", "bio": "Một chú cún Golden ấm áp, lúc nào cũng vui vẻ vẫy đuôi mỗi khi thấy Yaourt cười. Luôn ở đây lắng nghe và che chở cho em.", "avatar": ""}, "girl": {"name": "Yaourt", "nickname": "Bé Mèo Đen mắt vàng", "birthday": "2007", "likes": "Thích ngủ nướng, trà sữa, mèo con và được Gâu chiều", "bio": "Một bé mèo đen nhỏ nhắn, đôi khi hơi đỏng đảnh trêu anh nhưng lúc nào cũng thương Gâu nhất nhà.", "avatar": ""}}, "memories": [{"id": "m2", "date": "2026-02-14", "title": "Buổi hẹn có một chú mèo", "text": "Hôm đó có một chú mèo lạ đi ngang qua và cọ vào chân em. Anh bảo mèo cũng biết chọn người tốt.", "img": ""}, {"id": "m1", "date": "2025-11-13", "title": "Ngày mình bắt đầu", "text": "Bấm “Chỉnh sửa” để viết lại câu chuyện của hai bạn: lần đầu gặp nhau, buổi hẹn đầu tiên, chuyến đi chung.", "img": ""}], "letters": [{"id": "l1", "date": "2026-11-13", "title": "Gửi em", "text": "Em à,\n\nAnh viết những dòng này để sau này đọc lại, mình còn nhớ hôm nay mình vui đến mức nào.\n\nCảm ơn em vì đã ở đây, giống như một chú mèo nhỏ chọn góc nắng ấm nhất trong nhà.\n\nYêu em."}], "photos": [{"id": "p1", "date": "2026-08-24", "caption": "Khoảnh khắc đầu tiên của Yaourt và Gâu", "img": ""}, {"id": "p2", "date": "2026-09-15", "caption": "Đi dạo cùng nhau cuối tuần (bấm Chỉnh sửa để tải ảnh thật lên nhé!)", "img": ""}]}</script>
 
-<!-- Firebase Realtime Sync SDK -->
-<script type="module">
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-  import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
-
-  window.CloudSync = {
-    db: null,
-    roomRef: null,
-    init: function(dbUrl, roomCode, onDataCallback, onErrorCallback) {
-      try {
-        const cleanUrl = dbUrl.trim().replace(/\/$/, '');
-        const app = initializeApp({ databaseURL: cleanUrl }, "yaourtxgau_" + Date.now());
-        this.db = getDatabase(app);
-        this.roomRef = ref(this.db, "couples/" + (roomCode || "yaourtxgau"));
-        onValue(this.roomRef, (snapshot) => {
-          const val = snapshot.val();
-          onDataCallback(val);
-        }, (err) => {
-          if (onErrorCallback) onErrorCallback(err);
-        });
-        return true;
-      } catch (e) {
-        if (onErrorCallback) onErrorCallback(e);
-        return false;
-      }
-    },
-    push: async function(dataObj) {
-      if (!this.roomRef) throw new Error("Chưa kết nối Cloud");
-      await set(this.roomRef, dataObj);
-    }
-  };
-</script>
-
 <script id="app-script">
 (function(){
+var SHEETDB_API = "https://sheetdb.io/api/v1/fcom76d8nogmh";
+
 var $=function(s){return document.querySelector(s)};
 var esc=function(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})};
 var clone=function(o){return JSON.parse(JSON.stringify(o))};
@@ -284,15 +261,6 @@ function ensureSchema(obj){
 }
 ensureSchema(defaultState);
 
-// Lấy cấu hình Cloud từ URL hoặc localStorage
-var params=new URLSearchParams(location.search);
-var cloudUrl=params.get('db') || localStorage.getItem('yxg_db_url') || '';
-var roomId=params.get('room') || localStorage.getItem('yxg_room') || 'yaourtxgau';
-if(params.get('db')){
-  localStorage.setItem('yxg_db_url', params.get('db'));
-  localStorage.setItem('yxg_room', roomId);
-}
-
 var localBackup=null;
 try{ localBackup=JSON.parse(localStorage.getItem('yxg_local_data')); }catch(e){}
 var saved = ensureSchema(localBackup || defaultState);
@@ -301,7 +269,7 @@ var S=clone(saved), editing=false, busy=false;
 var currentTab='home';
 var highlightWho=null;
 var lightboxPhoto=null;
-var cloudStatus=cloudUrl ? 'connecting' : 'local';
+var syncState='loading'; // 'loading' | 'live' | 'error'
 
 var HEART='<svg class="ic-heart" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-8-5.2-8-11a4.6 4.6 0 0 1 8-3 4.6 4.6 0 0 1 8 3c0 5.8-8 11-8 11z" fill="currentColor"/></svg>';
 var PAW='<svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor"><ellipse cx="12" cy="16.2" rx="5" ry="4"/><ellipse cx="5" cy="10.5" rx="2.1" ry="2.8" transform="rotate(-18 5 10.5)"/><ellipse cx="9.4" cy="5.8" rx="2.1" ry="2.9"/><ellipse cx="14.6" cy="5.8" rx="2.1" ry="2.9"/><ellipse cx="19" cy="10.5" rx="2.1" ry="2.8" transform="rotate(18 19 10.5)"/></svg>';
@@ -454,8 +422,9 @@ function memories(){
         h+='<label class="lbl" for="d-'+m.id+'">Ngày</label><input class="fld" type="date" id="d-'+m.id+'" data-list="memories" data-id="'+m.id+'" data-key="date" value="'+esc(m.date)+'">'+
         '<label class="lbl" for="t-'+m.id+'">Tiêu đề</label><input class="fld" id="t-'+m.id+'" data-list="memories" data-id="'+m.id+'" data-key="title" value="'+esc(m.title)+'">'+
         '<label class="lbl" for="x-'+m.id+'">Câu chuyện</label><textarea class="fld" id="x-'+m.id+'" data-list="memories" data-id="'+m.id+'" data-key="text">'+esc(m.text)+'</textarea>'+
+        '<label class="lbl" for="u-'+m.id+'">Hoặc dán link ảnh (Google Drive / Imgur)</label><input class="fld" id="u-'+m.id+'" placeholder="https://..." data-list="memories" data-id="'+m.id+'" data-key="img" value="'+esc(m.img)+'">'+
         (m.img?'<img class="thumb" src="'+m.img+'" alt="Ảnh kỷ niệm">':'')+
-        '<div class="row"><label class="mini" for="i-'+m.id+'">'+(m.img?'Đổi ảnh':'Thêm ảnh')+'</label><input class="file" type="file" accept="image/*" id="i-'+m.id+'" data-act="img" data-list="memories" data-id="'+m.id+'">'+
+        '<div class="row"><label class="mini" for="i-'+m.id+'">'+(m.img?'Chọn ảnh khác từ máy':'Chọn ảnh từ máy')+'</label><input class="file" type="file" accept="image/*" id="i-'+m.id+'" data-act="img" data-list="memories" data-id="'+m.id+'">'+
         (m.img?'<button class="mini" data-act="rmimg" data-list="memories" data-id="'+m.id+'">Bỏ ảnh</button>':'')+
         '<button class="mini danger" data-act="del" data-list="memories" data-id="'+m.id+'">Xóa kỷ niệm</button></div>';
       }else{
@@ -503,6 +472,7 @@ function photosSection(){
       list.forEach(function(p){
         h+='<div class="card"><label class="lbl" for="pd-'+p.id+'">Ngày chụp</label><input class="fld" type="date" id="pd-'+p.id+'" data-list="photos" data-id="'+p.id+'" data-key="date" value="'+esc(p.date)+'">'+
         '<label class="lbl" for="pc-'+p.id+'">Chú thích ảnh</label><input class="fld" id="pc-'+p.id+'" data-list="photos" data-id="'+p.id+'" data-key="caption" value="'+esc(p.caption)+'">'+
+        '<label class="lbl" for="pu-'+p.id+'">Hoặc dán link ảnh (https://...)</label><input class="fld" id="pu-'+p.id+'" placeholder="https://..." data-list="photos" data-id="'+p.id+'" data-key="img" value="'+esc(p.img)+'">'+
         (p.img?'<img class="thumb" src="'+p.img+'" alt="Ảnh album">':'')+
         '<div class="row"><label class="mini" for="pi-'+p.id+'">'+(p.img?'Đổi ảnh khác':'Chọn ảnh từ máy')+'</label><input class="file" type="file" accept="image/*" id="pi-'+p.id+'" data-act="img" data-list="photos" data-id="'+p.id+'">'+
         (p.img?'<button class="mini" data-act="rmimg" data-list="photos" data-id="'+p.id+'">Bỏ ảnh</button>':'')+
@@ -537,6 +507,7 @@ function aboutSection(){
     h+='<div class="profile-head"><div class="avatar-ring">'+(boy.avatar?'<img src="'+boy.avatar+'" alt="Avatar">':dogSvg())+'</div><div class="profile-title"><h3>Phần của Bạn Nam</h3><span class="role-badge">🐶 Golden Retriever</span></div></div>'+
     '<div class="row"><label class="mini" for="av-boy">'+(boy.avatar?'Đổi ảnh đại diện':'Tải ảnh đại diện')+'</label><input class="file" type="file" accept="image/*" id="av-boy" data-act="aboutImg" data-who="boy">'+
     (boy.avatar?'<button class="mini" data-act="rmAboutImg" data-who="boy">Dùng hình cún chibi</button>':'')+'</div>'+
+    '<label class="lbl">Hoặc dán link ảnh đại diện</label><input class="fld" placeholder="https://..." data-about="boy" data-key="avatar" value="'+esc(boy.avatar)+'">'+
     '<label class="lbl">Tên / Biệt danh</label><input class="fld" data-about="boy" data-key="name" value="'+esc(boy.name)+'">'+
     '<label class="lbl">Danh hiệu dễ thương</label><input class="fld" data-about="boy" data-key="nickname" value="'+esc(boy.nickname)+'">'+
     '<label class="lbl">Ngày sinh / Năm sinh</label><input class="fld" data-about="boy" data-key="birthday" value="'+esc(boy.birthday)+'">'+
@@ -557,6 +528,7 @@ function aboutSection(){
     h+='<div class="profile-head"><div class="avatar-ring">'+(girl.avatar?'<img src="'+girl.avatar+'" alt="Avatar">':catSvg())+'</div><div class="profile-title"><h3>Phần của Bạn Nữ</h3><span class="role-badge">🐈‍⬛ Mèo Đen</span></div></div>'+
     '<div class="row"><label class="mini" for="av-girl">'+(girl.avatar?'Đổi ảnh đại diện':'Tải ảnh đại diện')+'</label><input class="file" type="file" accept="image/*" id="av-girl" data-act="aboutImg" data-who="girl">'+
     (girl.avatar?'<button class="mini" data-act="rmAboutImg" data-who="girl">Dùng hình mèo chibi</button>':'')+'</div>'+
+    '<label class="lbl">Hoặc dán link ảnh đại diện</label><input class="fld" placeholder="https://..." data-about="girl" data-key="avatar" value="'+esc(girl.avatar)+'">'+
     '<label class="lbl">Tên / Biệt danh</label><input class="fld" data-about="girl" data-key="name" value="'+esc(girl.name)+'">'+
     '<label class="lbl">Danh hiệu dễ thương</label><input class="fld" data-about="girl" data-key="nickname" value="'+esc(girl.nickname)+'">'+
     '<label class="lbl">Ngày sinh / Năm sinh</label><input class="fld" data-about="girl" data-key="birthday" value="'+esc(girl.birthday)+'">'+
@@ -587,6 +559,7 @@ function renderLightbox(){
 
 function render(){
   var photoCount=(S.photos||[]).length;
+  var syncText = syncState==='live' ? 'Đã đồng bộ Sheets' : (syncState==='loading' ? 'Đang tải dữ liệu…' : 'Chế độ ngoại tuyến');
   var top='<div class="top">'+
     '<div class="tabs" role="tablist" aria-label="Chuyển mục">'+
       '<button class="tab'+(currentTab==='home'?' active':'')+'" role="tab" aria-selected="'+(currentTab==='home')+'" data-act="tab" data-tab="home">'+BOOK+' Kỷ niệm & Thư</button>'+
@@ -594,6 +567,7 @@ function render(){
       '<button class="tab'+(currentTab==='about'?' active':'')+'" role="tab" aria-selected="'+(currentTab==='about')+'" data-act="tab" data-tab="about">'+USER_IC+' About Us</button>'+
     '</div>'+
     '<div class="top-right">'+
+      '<span class="sync-pill '+syncState+'" title="Trạng thái kết nối Google Sheets"><span class="sync-dot"></span>'+syncText+'</span>'+
       (!editing?'<button class="btn" data-act="edit">Chỉnh sửa</button>':'')+
     '</div>'+
   '</div>';
@@ -603,7 +577,7 @@ function render(){
   else if(currentTab==='photos') mainContent = photosSection();
   else if(currentTab==='about') mainContent = aboutSection();
 
-  var saveLabel = busy ? 'Đang lưu…' : (cloudStatus==='live' ? 'Lưu lên web chung' : 'Lưu thay đổi');
+  var saveLabel = busy ? 'Đang lưu lên Sheets…' : 'Lưu lên web chung';
   var bar=editing?'<div class="bar"><span>Đang chỉnh sửa góc nhỏ yaourtxgau.</span><button class="btn ghost" data-act="cancel">Hủy</button><button class="btn solid" data-act="save"'+(busy?' disabled':'')+'>'+saveLabel+'</button></div>':peek();
 
   $('#app').innerHTML=bg()+'<div class="wrap">'+top+hero()+mainContent+
@@ -611,12 +585,125 @@ function render(){
 }
 
 var toastEl=document.createElement('div');toastEl.className='toast';toastEl.setAttribute('role','status');document.body.appendChild(toastEl);
-var tt;function toast(t){toastEl.textContent=t;toastEl.classList.add('on');clearTimeout(tt);tt=setTimeout(function(){toastEl.classList.remove('on')},2600)}
+var tt;function toast(t){toastEl.textContent=t;toastEl.classList.add('on');clearTimeout(tt);tt=setTimeout(function(){toastEl.classList.remove('on')},3000)}
 function find(list,id){return (S[list]||[]).filter(function(x){return x.id===id})[0]}
-function compress(file){return new Promise(function(res,rej){
-  var url=URL.createObjectURL(file),im=new Image();
-  im.onload=function(){var k=Math.min(1,1000/Math.max(im.width,im.height)),w=Math.round(im.width*k),h=Math.round(im.height*k),c=document.createElement('canvas');c.width=w;c.height=h;c.getContext('2d').drawImage(im,0,0,w,h);URL.revokeObjectURL(url);res(c.toDataURL('image/jpeg',0.75))};
-  im.onerror=function(){rej(new Error('img'))};im.src=url;})}
+
+/* Nén ảnh tự động xuống dưới 42.000 ký tự để lưu vừa vặn trong 1 ô Google Sheets */
+function compress(file){
+  return new Promise(function(res,rej){
+    var url=URL.createObjectURL(file),im=new Image();
+    im.onload=function(){
+      var maxDim=560, quality=0.72, dataUrl='';
+      for(var attempt=0; attempt<5; attempt++){
+        var k=Math.min(1, maxDim/Math.max(im.width,im.height));
+        var w=Math.max(1, Math.round(im.width*k));
+        var h=Math.max(1, Math.round(im.height*k));
+        var c=document.createElement('canvas');
+        c.width=w; c.height=h;
+        c.getContext('2d').drawImage(im,0,0,w,h);
+        dataUrl=c.toDataURL('image/jpeg', quality);
+        if(dataUrl.length <= 44000) break;
+        maxDim = Math.round(maxDim * 0.78);
+        quality = Math.max(0.45, quality - 0.1);
+      }
+      URL.revokeObjectURL(url);
+      if(dataUrl.length > 48000){
+        toast('Ảnh hơi nặng, bạn có thể dán link ảnh (Imgur/Drive) để nét hơn nhé!');
+      }
+      res(dataUrl);
+    };
+    im.onerror=function(){rej(new Error('img'))};
+    im.src=url;
+  });
+}
+
+/* Đọc toàn bộ 5 tab từ Google Sheets qua SheetDB */
+async function fetchFromSheetDB(){
+  try{
+    var [resSet, resMem, resLet, resPho, resAbt] = await Promise.all([
+      fetch(SHEETDB_API + '?sheet=Settings'),
+      fetch(SHEETDB_API + '?sheet=Memories'),
+      fetch(SHEETDB_API + '?sheet=Letters'),
+      fetch(SHEETDB_API + '?sheet=Photos'),
+      fetch(SHEETDB_API + '?sheet=AboutUs')
+    ]);
+    if(!resSet.ok || !resMem.ok || !resLet.ok || !resPho.ok || !resAbt.ok){
+      throw new Error('Không thể tải dữ liệu từ SheetDB');
+    }
+    var [rowsSet, rowsMem, rowsLet, rowsPho, rowsAbt] = await Promise.all([
+      resSet.json(), resMem.json(), resLet.json(), resPho.json(), resAbt.json()
+    ]);
+
+    var remote = clone(defaultState);
+
+    if(Array.isArray(rowsSet) && rowsSet.length){
+      rowsSet.forEach(function(r){
+        if(r.key && r.value !== undefined) remote[r.key] = r.value;
+      });
+    }
+
+    if(Array.isArray(rowsMem)){
+      remote.memories = rowsMem.filter(function(r){return r.id || r.title || r.text}).map(function(r){
+        return { id: r.id || uid(), date: r.date || '', title: r.title || '', text: r.text || '', img: r.img || '' };
+      });
+    }
+
+    if(Array.isArray(rowsLet)){
+      remote.letters = rowsLet.filter(function(r){return r.id || r.title || r.text}).map(function(r){
+        return { id: r.id || uid(), date: r.date || '', title: r.title || '', text: r.text || '' };
+      });
+    }
+
+    if(Array.isArray(rowsPho)){
+      remote.photos = rowsPho.filter(function(r){return r.id || r.caption || r.img}).map(function(r){
+        return { id: r.id || uid(), date: r.date || '', caption: r.caption || '', img: r.img || '' };
+      });
+    }
+
+    if(Array.isArray(rowsAbt) && rowsAbt.length){
+      rowsAbt.forEach(function(r){
+        var w = (r.who === 'girl') ? 'girl' : (r.who === 'boy' ? 'boy' : null);
+        if(w){
+          remote.about[w] = {
+            name: r.name || '',
+            nickname: r.nickname || '',
+            birthday: r.birthday || '',
+            likes: r.likes || '',
+            bio: r.bio || '',
+            avatar: r.avatar || ''
+          };
+        }
+      });
+    }
+
+    ensureSchema(remote);
+    saved = clone(remote);
+    if(!editing) S = clone(remote);
+    try{ localStorage.setItem('yxg_local_data', JSON.stringify(remote)); }catch(e){}
+    syncState = 'live';
+    render();
+  }catch(err){
+    console.error(err);
+    syncState = 'error';
+    render();
+  }
+}
+
+/* Ghi đè dữ liệu 1 tab trên SheetDB (Xóa cũ -> Thêm mới) */
+async function replaceSheetTab(sheetName, rows){
+  var delRes = await fetch(SHEETDB_API + '/all?sheet=' + encodeURIComponent(sheetName), {
+    method: 'DELETE'
+  });
+  if(!delRes.ok) throw new Error('Lỗi xóa dữ liệu cũ ở tab ' + sheetName);
+  if(rows && rows.length){
+    var postRes = await fetch(SHEETDB_API + '?sheet=' + encodeURIComponent(sheetName), {
+      method: 'POST',
+      headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
+      body: JSON.stringify({ data: rows })
+    });
+    if(!postRes.ok) throw new Error('Lỗi ghi dữ liệu mới vào tab ' + sheetName);
+  }
+}
 
 async function save(){
   if(busy)return;
@@ -625,44 +712,58 @@ async function save(){
 
   try{ localStorage.setItem('yxg_local_data', JSON.stringify(next)); }catch(e){}
 
-  if(cloudStatus==='live' && window.CloudSync){
-    try{
-      await window.CloudSync.push(next);
-      saved=clone(next);S=clone(next);editing=false;busy=false;render();
-      toast('Đã lưu thành công! Người yêu mở trang sẽ thấy ngay ✨');
-      return;
-    }catch(err){
-      busy=false;render();
-      toast('Lỗi lưu Cloud: '+(err.message||'Vui lòng thử lại!'));
-      return;
-    }
-  }
+  try{
+    var settingsRows = [
+      { key: 'nameA', value: next.nameA || '' },
+      { key: 'nameB', value: next.nameB || '' },
+      { key: 'tagline', value: next.tagline || '' },
+      { key: 'startDate', value: next.startDate || '' }
+    ];
+    var memRows = (next.memories || []).map(function(m){
+      return { id: m.id || uid(), date: m.date || '', title: m.title || '', text: m.text || '', img: m.img || '' };
+    });
+    var letRows = (next.letters || []).map(function(l){
+      return { id: l.id || uid(), date: l.date || '', title: l.title || '', text: l.text || '' };
+    });
+    var phoRows = (next.photos || []).map(function(p){
+      return { id: p.id || uid(), date: p.date || '', caption: p.caption || '', img: p.img || '' };
+    });
+    var aboutRows = [
+      {
+        who: 'boy',
+        name: (next.about.boy && next.about.boy.name) || '',
+        nickname: (next.about.boy && next.about.boy.nickname) || '',
+        birthday: (next.about.boy && next.about.boy.birthday) || '',
+        likes: (next.about.boy && next.about.boy.likes) || '',
+        bio: (next.about.boy && next.about.boy.bio) || '',
+        avatar: (next.about.boy && next.about.boy.avatar) || ''
+      },
+      {
+        who: 'girl',
+        name: (next.about.girl && next.about.girl.name) || '',
+        nickname: (next.about.girl && next.about.girl.nickname) || '',
+        birthday: (next.about.girl && next.about.girl.birthday) || '',
+        likes: (next.about.girl && next.about.girl.likes) || '',
+        bio: (next.about.girl && next.about.girl.bio) || '',
+        avatar: (next.about.girl && next.about.girl.avatar) || ''
+      }
+    ];
 
-  saved=clone(next);S=clone(next);editing=false;busy=false;render();
-  toast('Đã lưu thay đổi!');
-}
+    await Promise.all([
+      replaceSheetTab('Settings', settingsRows),
+      replaceSheetTab('Memories', memRows),
+      replaceSheetTab('Letters', letRows),
+      replaceSheetTab('Photos', phoRows),
+      replaceSheetTab('AboutUs', aboutRows)
+    ]);
 
-function connectCloud(){
-  if(!cloudUrl) return;
-  if(!window.CloudSync){
-    setTimeout(connectCloud, 300);
-    return;
+    saved=clone(next);S=clone(next);editing=false;busy=false;syncState='live';render();
+    toast('Đã lưu lên Google Sheets! Người yêu mở trang sẽ thấy ngay ✨');
+  }catch(err){
+    console.error(err);
+    busy=false;syncState='error';render();
+    toast('Lỗi lưu dữ liệu: ' + (err.message || 'Kiểm tra lại kết nối mạng nhé!'));
   }
-  cloudStatus='connecting';
-  window.CloudSync.init(cloudUrl, roomId, function(remoteData){
-    cloudStatus='live';
-    if(remoteData){
-      ensureSchema(remoteData);
-      saved=clone(remoteData);
-      if(!editing) S=clone(remoteData);
-    }else{
-      window.CloudSync.push(saved);
-    }
-    render();
-  }, function(){
-    cloudStatus='error';
-    render();
-  });
 }
 
 /* Màn hội thoại tự động dễ thương của Cún và Mèo Đen */
@@ -799,7 +900,7 @@ document.addEventListener('change',function(e){
 });
 
 render();
-if(cloudUrl) connectCloud();
+fetchFromSheetDB();
 })();
 </script>
 </body>
